@@ -41,6 +41,28 @@ export default function CreateWorkspacePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('غير مصرح');
 
+      // Ensure profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      // If profile doesn't exist, create it
+      if (profileError || !profile) {
+        const { error: createProfileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email!,
+            full_name_ar: user.user_metadata?.full_name_ar || '',
+            full_name_en: user.user_metadata?.full_name_en || '',
+            lang_preference: user.user_metadata?.lang_preference || 'ar',
+          });
+
+        if (createProfileError) throw createProfileError;
+      }
+
       // Create workspace
       const { data: workspaceData, error: workspaceError } = await supabase
         .from('workspaces')
@@ -97,6 +119,7 @@ export default function CreateWorkspacePage() {
       // Redirect to workspace
       router.push(`/workspace/${workspaceData.id}`);
     } catch (err: any) {
+      console.error('Error creating workspace:', err);
       setError(err.message || 'حدث خطأ أثناء إنشاء مساحة العمل');
     } finally {
       setIsLoading(false);
